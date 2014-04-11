@@ -36,20 +36,10 @@ var settings_  settings.Settings
 func main() {
     statistics = make(map[string][]LogEventInterface)
 
-    configJson, err := ioutil.ReadFile("config.json")
-
-    if err != nil {
-        log.Fatalf("Error reading config.json: %s", err)
-    }
-
-    err = json.Unmarshal(configJson, &settings_)
-
-    if err != nil {
-        log.Fatalf("Error reading config.json: %s", err)
-    }
+    loadConfig()
 
     linenoise.SetCompletionHandler(func (in string) []string {
-        availableCommands := []string{"clear", "help", "show", "quit", "summary"}
+        availableCommands := []string{"clear", "help", "reload", "show", "quit", "summary"}
         matchedCommands   := []string{}
 
         for _, command := range availableCommands {
@@ -93,10 +83,11 @@ func main() {
 
             switch (args[0]) {
             case "": break
-            case "quit": quit(); break
-            case "summary": summary(); break
             case "clear": linenoise.Clear(); break
+            case "quit": quit(); break
+            case "reload": loadConfig(); break
             case "show": show(args[1:]); break
+            case "summary": summary(); break
 
             default:
                 index, err := strconv.ParseInt(line, 10, 32)
@@ -112,6 +103,22 @@ func main() {
     }()
 
     readLog()
+}
+
+func loadConfig() {
+    configJson, err := ioutil.ReadFile("config.json")
+
+    if err != nil {
+        log.Fatalf("Error reading config.json: %s", err)
+    }
+
+    err = json.Unmarshal(configJson, &settings_)
+
+    if err != nil {
+        log.Fatalf("Error reading config.json: %s", err)
+    }
+
+    fmt.Println("Loaded config\n")
 }
 
 func quit() {
