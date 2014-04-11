@@ -28,6 +28,7 @@ func (e *PhpLogEvent) PrintLine(index int) {
         background = ct.None
         break
     case "Fatal error":
+    case "Catchable fatal error":
         background = ct.Red
         break
     default:
@@ -138,7 +139,7 @@ func NewPhpLogEvent(
 
     re = regexp.MustCompile(
         "^(?P<source>.*?): PHP (?P<level>.*?):  (?P<content>.{1,}) in (?P<file>[^ ]{1,}) "+
-        "on line (?P<line>[0-9]{1,})$",
+        "on line (?P<line>[0-9]{1,})",
     )
 
     matches = re.FindStringSubmatch(message)
@@ -147,7 +148,7 @@ func NewPhpLogEvent(
         line, err := strconv.ParseInt(matches[5], 10, 32)
 
         if err != nil {
-            log.Fatalf("Could not parse line: %s (%s)\n", matches[4], err)
+            log.Fatalf("Could not parse line: %s (%s)\n", matches[5], err)
         }
 
         return &PhpLogEvent{
