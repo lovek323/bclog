@@ -28,7 +28,12 @@ func (e *PhpLogEvent) PrintLine(index int) {
         background = ct.None
         break
     case "Fatal error":
+        background = ct.Red
+        break
     case "Catchable fatal error":
+        background = ct.Red
+        break
+    case "SQL Error":
         background = ct.Red
         break
     default:
@@ -138,7 +143,32 @@ func NewPhpLogEvent(
     }
 
     re = regexp.MustCompile(
-        "^(?P<source>.*?): PHP (?P<level>.*?):  (?P<content>.{1,}) in (?P<file>[^ ]{1,}) "+
+        "^php: SQL Error \\(store_(?P<storeId>[0-9]{1,})\\): "+
+        "(?P<content>.{1,}) in (?P<file>[^ ]{1,}) "+
+        "on line (?P<line>[0-9]{1,})",
+    )
+
+    matches = re.FindStringSubmatch(message)
+
+    if matches != nil {
+        line, err := strconv.ParseInt(matches[4], 10, 32)
+
+        if err != nil {
+            log.Fatalf("Could not parse line: %s (%s)\n", matches[4], err)
+        }
+
+        return &PhpLogEvent{
+            SyslogTime: syslogTime,
+            LogLevel:   "SQL Error",
+            Content:    matches[2]+ " (store ID: "+matches[1]+")",
+            File:       matches[3],
+            Line:       int(line),
+        }
+    }
+
+    re = regexp.MustCompile(
+        "^(?P<source>.*?): PHP (?P<level>.*?):  (?P<content>.{1,}) "+
+        "in (?P<file>[^ ]{1,}) "+
         "on line (?P<line>[0-9]{1,})",
     )
 
@@ -220,6 +250,8 @@ func NewPhpLogEvent(
             Line:       int(line),
         }
     }
+
+    fmt.Printf("\rNot a PHP log message: %s\n", message)
 
     return nil
 }

@@ -218,6 +218,7 @@ func readLog() {
         event := getEvent(line)
 
         if event == nil {
+            fmt.Print("\r")
             log.Printf("Could not parse: %s", line)
         } else {
             if (!event.Suppress(&settings_)) {
