@@ -11,7 +11,8 @@ import (
 )
 
 type NginxLogEventInterface interface {
-    Println()
+    Println(int)
+    PrintFull()
 }
 
 type NginxAccessLogEvent struct {
@@ -31,7 +32,7 @@ type NginxLogEventRequest struct {
     ContentLength   int
 }
 
-func (e *NginxAccessLogEvent) Println() {
+func (e *NginxAccessLogEvent) Println(index int) {
     // Ignore 200-399 events manually for now
     if e.Request.StatusCode >= 200 && e.Request.StatusCode < 400 {
         return
@@ -48,6 +49,7 @@ func (e *NginxAccessLogEvent) Println() {
         bold       = true
     }
 
+    fmt.Printf("[%d]  ", index)
     fmt.Print(e.Time.Format("2006-01-02 15:04:05")+"  ")
     ct.ChangeColor(ct.Yellow, bold, background, false)
     fmt.Print("nginx-access  ")
@@ -55,6 +57,24 @@ func (e *NginxAccessLogEvent) Println() {
     fmt.Printf("%s-%d  ", e.Request.Method, e.Request.StatusCode)
     fmt.Printf("%s\n", e.Request.Uri)
     ct.ResetColor()
+}
+
+func (e *NginxAccessLogEvent) PrintFull() {
+    fmt.Printf("\n---------- NGINX ACCESS LOG EVENT ----------\n");
+    fmt.Printf(
+        "SyslogTime:      %s\n",
+        e.SyslogTime.Format("2006-01-02 15:04:05"),
+    )
+    fmt.Printf("Source:          %s\n", e.Source)
+    fmt.Printf("Hostname:        %s\n", e.Hostname)
+    fmt.Printf("IpAddress:       %s\n", e.IpAddress)
+    fmt.Printf("Time:            %s\n", e.Time.Format("2006-01-02 15:04:05"))
+    fmt.Printf("Method:          %s\n", e.Request.Method)
+    fmt.Printf("Uri:             %s\n", e.Request.Uri)
+    fmt.Printf("ProtocolVersion: %s\n", e.Request.ProtocolVersion)
+    fmt.Printf("StatusCode:      %d\n", e.Request.StatusCode)
+    fmt.Printf("ContentLength:   %d\n", e.Request.ContentLength)
+    fmt.Printf("--------------------------------------------\n\n");
 }
 
 type NginxErrorLogEvent struct {
@@ -68,7 +88,9 @@ type NginxErrorLogEvent struct {
     Referrer   string
 }
 
-func (e *NginxErrorLogEvent) Println() {
+func (e *NginxErrorLogEvent) Println(index int) {
+    fmt.Printf("[%d]  ", index)
+
     if e.LogLevel == "error" {
         fmt.Print(e.SyslogTime.Format("2006-01-02 15:04:05")+"  ")
         ct.ChangeColor(ct.Yellow, false, ct.Red, false)
@@ -87,6 +109,9 @@ func (e *NginxErrorLogEvent) Println() {
         ct.ResetColor()
         fmt.Printf("%s %s\n", e.Request.Uri, e.Content)
     }
+}
+
+func (e *NginxErrorLogEvent) PrintFull() {
 }
 
 func NewNginxLogEvent(syslogTime time.Time, source string, message string) NginxLogEventInterface {

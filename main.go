@@ -3,18 +3,22 @@ package main
 import (
     "bufio"
     "fmt"
+    "io"
     "log"
     "os"
+    "os/exec"
     "regexp"
     "strconv"
     "time"
 
-    ct     "github.com/daviddengcn/go-colortext"
-    events "github.com/lovek323/bclog/events"
+    ct        "github.com/daviddengcn/go-colortext"
+    events    "github.com/lovek323/bclog/events"
+    linenoise "github.com/GeertJohan/go.linenoise"
 )
 
 type LogEventInterface interface {
-    Println()
+    Println(int)
+    PrintFull()
 }
 
 type ProcessLogEvent struct {
@@ -24,7 +28,7 @@ type ProcessLogEvent struct {
     Content    string
 }
 
-func (e *ProcessLogEvent) Println() {
+func (e *ProcessLogEvent) Println(index int) {
     // TODO: Create a CronLogEvent and handle that separately (looking for
     // errors)
     /* Ignore cron and postfix log messages manually. */
@@ -37,6 +41,7 @@ func (e *ProcessLogEvent) Println() {
         return
     }
 
+    fmt.Printf("[%d]  ", index)
     fmt.Print(e.SyslogTime.Format("2006-01-02 15:04:05")+"  ")
     ct.ChangeColor(ct.Yellow, false, ct.None, false)
     fmt.Print("process  ")
@@ -46,30 +51,102 @@ func (e *ProcessLogEvent) Println() {
     fmt.Printf("%s\n", e.Content)
 }
 
+func (e *ProcessLogEvent) PrintFull() {
+}
+
+var history []LogEventInterface
+
 func main() {
-    reader := bufio.NewReader(os.Stdin)
+    go func () {
+        for {
+            line, err := linenoise.Line("")
+
+            if err != nil {
+                if err == linenoise.KillSignalError {
+                    quit()
+                } else {
+                    log.Fatalf("Could not read line: %s\n", err)
+                }
+            }
+
+            if len(line) > 0 {
+                if (line == "quit") {
+                    quit()
+                } else {
+                    index, err := strconv.ParseInt(line, 10, 32)
+
+                    if err == nil {
+                        event := history[index]
+                        event.PrintFull()
+                    } else {
+                        fmt.Printf("Received %s\n", line)
+                    }
+                }
+            }
+        }
+    }()
+
+    readLog()
+}
+
+func quit() {
+    os.Exit(0)
+}
+
+func readLog() {
+    command := exec.Command(
+        "ssh",
+        "vagrant@localhost",
+        "-p2222",
+        "-i",
+        "/Users/jason.oconal/.vagrant.d/insecure_private_key",
+        "--",
+        "sudo tail -n 500 -f /var/log/syslog",
+    )
+
+    stdout, err := command.StdoutPipe()
+
+    if err != nil {
+        log.Printf("Could not create log tail command: %s\n", err)
+    }
+
+    if err = command.Start(); err != nil {
+        log.Printf("Could not start log tail command: %s\n", err)
+    }
+
+    reader  := bufio.NewReader(stdout)
 
     for {
         line, err := reader.ReadString('\n')
 
         if err != nil {
-            log.Printf("Could not read from STDIN: %s", err)
-            return
+            if err != io.EOF {
+                log.Printf("Could not read from log tail command stdout: %s", err)
+            } else {
+                log.Printf("EOF")
+            }
+            break
         }
+
+        fmt.Print("\r")
 
         event := getEvent(line)
 
         if event == nil {
             log.Printf("Could not parse: %s", line)
         } else {
-            event.Println()
+            event.Println(len(history))
+            history = append(history, event)
         }
     }
+
+    command.Wait()
 }
 
 func getEvent(text string) LogEventInterface {
     re := regexp.MustCompile(
-        "^(?P<date>(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Oct|Nov|Dec) (?:[0-9]{1,}) [0-9]{2}:[0-9]{2}:[0-9]{2}) "+
+        "^(?P<date>(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Oct|Nov|Dec) "+
+        "(?:[0-9]{1,}) [0-9]{2}:[0-9]{2}:[0-9]{2}) "+
         "(?P<source>.*?) "+
         //"(?P<process>[A-Za-z])\\[(?P<pid>[0-9]{1,})\\]: "+
         "(?P<message>.*)\n$",

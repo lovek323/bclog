@@ -11,7 +11,8 @@ import (
 )
 
 type PhpLogEventInterface interface {
-    Println()
+    Println(int)
+    PrintFull()
 }
 
 type PhpLogEvent struct {
@@ -22,7 +23,7 @@ type PhpLogEvent struct {
     Line       int
 }
 
-func (e *PhpLogEvent) Println() {
+func (e *PhpLogEvent) Println(index int) {
     ignoreFilters := []string{
         "^Failed to write to Twig cache.*$",
         "^Undefined index: MBALoginToken$",
@@ -58,6 +59,7 @@ func (e *PhpLogEvent) Println() {
         log.Fatalf(e.LogLevel)
     }
 
+    fmt.Printf("[%d]  ", index)
     fmt.Print(e.SyslogTime.Format("2006-01-02 15:04:05")+"  ")
     ct.ChangeColor(ct.Yellow, false, background, false)
     fmt.Print("php  ")
@@ -68,6 +70,9 @@ func (e *PhpLogEvent) Println() {
     ct.ResetColor()
 }
 
+func (e *PhpLogEvent) PrintFull() {
+}
+
 type PhpStackTraceEvent struct {
     SyslogTime time.Time
     Number     int
@@ -76,10 +81,11 @@ type PhpStackTraceEvent struct {
     Line       int
 }
 
-func (e *PhpStackTraceEvent) Println() {
+func (e *PhpStackTraceEvent) Println(index int) {
     // Don't show stack traces.
     return;
 
+    fmt.Printf("[%d]  ", index)
     fmt.Print(e.SyslogTime.Format("2006-01-02 15:04:05")+"  ")
     ct.ChangeColor(ct.Yellow, false, ct.None, false)
     fmt.Print("php-stack-trace  ")
@@ -87,6 +93,9 @@ func (e *PhpStackTraceEvent) Println() {
     fmt.Printf("%d-%s-%d  ", e.Number, e.File, e.Line)
     ct.ResetColor()
     fmt.Printf("%s\n", e.Method)
+}
+
+func (e *PhpStackTraceEvent) PrintFull() {
 }
 
 func NewPhpLogEvent(
