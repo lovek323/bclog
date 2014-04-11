@@ -96,7 +96,7 @@ func main() {
                     event := history[index]
                     event.PrintFull()
                 } else {
-                    fmt.Printf("Unrecognised command: %s\n", line)
+                    fmt.Printf("Unrecognised command: %s\n\n", line)
                 }
             }
         }
@@ -188,7 +188,7 @@ func readLog() {
         "-i",
         "/Users/jason.oconal/.vagrant.d/insecure_private_key",
         "--",
-        "sudo tail -n 1000 -f /var/log/syslog",
+        "sudo tail -n 10000 -f /var/log/syslog",
     )
 
     stdout, err := command.StdoutPipe()
@@ -215,15 +215,15 @@ func readLog() {
             break
         }
 
-        fmt.Print("\r")
-
         event := getEvent(line)
 
         if event == nil {
             log.Printf("Could not parse: %s", line)
         } else {
             if (!event.Suppress(&settings_)) {
+                fmt.Print("\r")
                 event.PrintLine(len(history))
+                fmt.Print("\r> ")
             }
 
             history = append(history, event)
