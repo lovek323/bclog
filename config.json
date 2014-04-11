@@ -1,0 +1,26 @@
+{
+  "PrimaryKeyFile": "/Users/jason.oconal/.vagrant.d/insecure_private_key",
+  "BigcommerceApp": {
+    "SuppressLogLevels": [ "DEBUG" ]
+  },
+  "NginxAccess": {
+    "SuppressStatusCodes": [ 200, 204, 302, 304 ]
+  },
+  "Process": {
+    "SuppressNames": [
+      "/USR/SBIN/CRON",
+      "postfix/pickup",
+      "postfix/cleanup",
+      "postfix/qmgr",
+      "postfix/discard",
+      "postfix/smtp"
+    ]
+  },
+  "Php": {
+    "SuppressStackTraces": false,
+    "SuppressContentRegexes": [
+      "^Failed to write to Twig cache.*$",
+      "^Undefined index: MBALoginToken$"
+    ]
+  }
+}

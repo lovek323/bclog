@@ -186,7 +186,7 @@ func readLog() {
         "vagrant@localhost",
         "-p2222",
         "-i",
-        "/Users/jason.oconal/.vagrant.d/insecure_private_key",
+        settings_.PrimaryKeyFile,
         "--",
         "sudo tail -n 10000 -f /var/log/syslog",
     )

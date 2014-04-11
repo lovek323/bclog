@@ -1,6 +1,8 @@
 package settings
 
 type Settings struct {
+    PrimaryKeyFile string
+
     BigcommerceApp struct {
         SuppressLogLevels []string
     }

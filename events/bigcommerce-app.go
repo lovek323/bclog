@@ -5,6 +5,7 @@ import (
     "fmt"
     "log"
     "regexp"
+    "strings"
     "time"
 
     ct       "github.com/daviddengcn/go-colortext"
@@ -97,16 +98,21 @@ func NewBigcommerceAppLogEvent(
     args             := matches[3]
     storeContextJson := matches[4]
 
+    // Replace NULL with 0
+    storeContextJson = strings.Replace(storeContextJson, "NULL", "0", -1)
+
     var storeContext BigcommerceAppStoreContext
 
     err := json.Unmarshal([]byte(storeContextJson), &storeContext)
 
     if err != nil {
-        log.Fatalf(
+        log.Printf(
             "Could not parse store context: %s (%s)\n",
             storeContextJson,
             err,
         )
+
+        return nil
     }
 
     return &BigcommerceAppLogEvent{
