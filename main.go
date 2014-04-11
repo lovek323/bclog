@@ -2,64 +2,74 @@ package main
 
 import (
     "bufio"
+    "encoding/json"
     "fmt"
     "io"
+    "io/ioutil"
     "log"
     "os"
     "os/exec"
     "regexp"
     "strconv"
+    "strings"
+    "text/tabwriter"
     "time"
 
-    ct        "github.com/daviddengcn/go-colortext"
     events    "github.com/lovek323/bclog/events"
+    settings  "github.com/lovek323/bclog/settings"
     linenoise "github.com/GeertJohan/go.linenoise"
 )
 
 type LogEventInterface interface {
-    Println(int)
+    PrintLine(int)
     PrintFull()
+
+    GetSyslogTime()                      time.Time
+    Summary()                            string
+    Suppress(settings.SettingsInterface) bool
 }
 
-type ProcessLogEvent struct {
-    SyslogTime time.Time
-    Name       string
-    ProcessId  int
-    Content    string
-}
-
-func (e *ProcessLogEvent) Println(index int) {
-    // TODO: Create a CronLogEvent and handle that separately (looking for
-    // errors)
-    /* Ignore cron and postfix log messages manually. */
-    if (e.Name == "/USR/SBIN/CRON"  ||
-        e.Name == "postfix/pickup"  ||
-        e.Name == "postfix/cleanup" ||
-        e.Name == "postfix/qmgr"    ||
-        e.Name == "postfix/discard" ||
-        e.Name == "postfix/smtp") {
-        return
-    }
-
-    fmt.Printf("[%d]  ", index)
-    fmt.Print(e.SyslogTime.Format("2006-01-02 15:04:05")+"  ")
-    ct.ChangeColor(ct.Yellow, false, ct.None, false)
-    fmt.Print("process  ")
-    ct.ChangeColor(ct.Cyan, false, ct.None, false)
-    fmt.Printf("%s-%d  ", e.Name, e.ProcessId)
-    ct.ResetColor()
-    fmt.Printf("%s\n", e.Content)
-}
-
-func (e *ProcessLogEvent) PrintFull() {
-}
-
-var history []LogEventInterface
+var history    []LogEventInterface
+var statistics map[string][]LogEventInterface
+var settings_  settings.Settings
 
 func main() {
+    statistics = make(map[string][]LogEventInterface)
+
+    configJson, err := ioutil.ReadFile("config.json")
+
+    if err != nil {
+        log.Fatalf("Error reading config.json: %s", err)
+    }
+
+    err = json.Unmarshal(configJson, &settings_)
+
+    if err != nil {
+        log.Fatalf("Error reading config.json: %s", err)
+    }
+
+    linenoise.SetCompletionHandler(func (in string) []string {
+        availableCommands := []string{"clear", "help", "show", "quit", "summary"}
+        matchedCommands   := []string{}
+
+        for _, command := range availableCommands {
+            if len(in) <= len(command) && strings.Index(command, in) == 0 {
+                matchedCommands = append(matchedCommands, command)
+            } else if len(in) > len("show") && in[0:len("show")] == "show" {
+                for summary, _ := range statistics {
+                    if len(in[len("show "):]) <= len(summary) && strings.Index(summary, in[len("show "):]) == 0 {
+                        matchedCommands = append(matchedCommands, "show "+summary)
+                    }
+                }
+            }
+        }
+
+        return matchedCommands
+    })
+
     go func () {
         for {
-            line, err := linenoise.Line("")
+            line, err := linenoise.Line("> ")
 
             if err != nil {
                 if err == linenoise.KillSignalError {
@@ -69,18 +79,33 @@ func main() {
                 }
             }
 
-            if len(line) > 0 {
-                if (line == "quit") {
-                    quit()
-                } else {
-                    index, err := strconv.ParseInt(line, 10, 32)
+            err = linenoise.AddHistory(line)
 
-                    if err == nil {
-                        event := history[index]
-                        event.PrintFull()
-                    } else {
-                        fmt.Printf("Received %s\n", line)
-                    }
+            if err != nil {
+                log.Printf("Failed to add %s to history (%s)\n", line, err)
+            }
+
+            args := strings.Split(line, " ")
+
+            if len(args) == 0 {
+                continue
+            }
+
+            switch (args[0]) {
+            case "": break
+            case "quit": quit(); break
+            case "summary": summary(); break
+            case "clear": linenoise.Clear(); break
+            case "show": show(args[1:]); break
+
+            default:
+                index, err := strconv.ParseInt(line, 10, 32)
+
+                if err == nil {
+                    event := history[index]
+                    event.PrintFull()
+                } else {
+                    fmt.Printf("Unrecognised command: %s\n", line)
                 }
             }
         }
@@ -93,6 +118,61 @@ func quit() {
     os.Exit(0)
 }
 
+func summary() {
+    fmt.Print("\n---------- SUMMARY ----------\n")
+
+    writer := new(tabwriter.Writer)
+    writer.Init(os.Stdout, 0, 8, 2, ' ', 0)
+
+    for summary, events := range statistics {
+        lastDuration := history[len(history)-1].GetSyslogTime().Sub(
+            events[len(events)-1].GetSyslogTime(),
+        )
+
+        fmt.Fprintf(
+            writer,
+            "%s\t%d event(s)\tLast %s ago\n",
+            summary,
+            len(events),
+            lastDuration,
+        )
+    }
+
+    writer.Flush()
+
+    fmt.Print("-----------------------------\n\n")
+}
+
+func show(args []string) {
+    if len(args) < 2 {
+        fmt.Println("Invalid syntax: show requires two arguments")
+        fmt.Println("show <type> <duration>\n")
+
+        return
+    }
+
+    summary       := args[0]
+    duration, err := time.ParseDuration(args[1])
+
+    if err != nil {
+        fmt.Println(
+            "Invalid syntax: second argument to show must be a valid duration",
+        );
+        fmt.Println("show <type> <duration>\n");
+    }
+
+    fmt.Println("\n---------- SHOW ----------");
+    fmt.Printf("Showing %s events from the last %s\n", summary, duration)
+
+    for index, event := range history {
+        if event.Summary() == summary &&
+            history[len(history)-1].GetSyslogTime().Sub(event.GetSyslogTime()) <= duration {
+            event.PrintLine(index)
+        }
+    }
+    fmt.Println("--------------------------\n");
+}
+
 func readLog() {
     command := exec.Command(
         "ssh",
@@ -101,7 +181,7 @@ func readLog() {
         "-i",
         "/Users/jason.oconal/.vagrant.d/insecure_private_key",
         "--",
-        "sudo tail -n 500 -f /var/log/syslog",
+        "sudo tail -n 1000 -f /var/log/syslog",
     )
 
     stdout, err := command.StdoutPipe()
@@ -121,9 +201,9 @@ func readLog() {
 
         if err != nil {
             if err != io.EOF {
-                log.Printf("Could not read from log tail command stdout: %s", err)
+                log.Printf("Could not read from log tail command stdout: %s\n", err)
             } else {
-                log.Printf("EOF")
+                log.Printf("EOF\n")
             }
             break
         }
@@ -135,8 +215,18 @@ func readLog() {
         if event == nil {
             log.Printf("Could not parse: %s", line)
         } else {
-            event.Println(len(history))
+            if (!event.Suppress(&settings_)) {
+                event.PrintLine(len(history))
+            }
+
             history = append(history, event)
+            summary := event.Summary()
+
+            if _, exists := statistics[summary]; !exists {
+                statistics[summary] = make([]LogEventInterface, 1)
+            }
+
+            statistics[summary] = append(statistics[summary], event)
         }
     }
 
@@ -175,7 +265,7 @@ func getEvent(text string) LogEventInterface {
         return event
     }
 
-    event = getProcessEvent(syslogTime, source, message)
+    event = events.NewProcessLogEvent(syslogTime, source, message)
 
     if event != (LogEventInterface)(nil) {
         return event
@@ -188,50 +278,4 @@ func getEvent(text string) LogEventInterface {
     }
 
     return nil
-}
-
-func getProcessEvent(syslogTime time.Time, source string, message string) LogEventInterface {
-    re := regexp.MustCompile(
-        "^(?P<name>.*?)\\[(?P<processId>[0-9]{1,})\\]: (?P<message>.*)$",
-    )
-
-    matches := re.FindStringSubmatch(message)
-
-    if matches == nil {
-        return nil
-    }
-
-    name := matches[1]
-
-    processId, err := strconv.ParseInt(matches[2], 10, 32)
-
-    if err != nil {
-        log.Fatalf("Could not parse process ID: %s (%s)\n", matches[2], err)
-    }
-
-    content := matches[3]
-
-    switch (name) {
-    case "bigcommerce_app":
-        event := events.NewBigcommerceAppLogEvent(
-            syslogTime,
-            source,
-            int(processId),
-            content,
-        )
-
-        // This could be a PHP error as well.
-        if event != (*events.BigcommerceAppLogEvent)(nil) {
-            return event
-        }
-
-        return nil
-    }
-
-    return &ProcessLogEvent{
-        SyslogTime: syslogTime,
-        Name:       name,
-        ProcessId:  int(processId),
-        Content:    content,
-    }
 }

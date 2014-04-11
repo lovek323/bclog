@@ -7,13 +7,9 @@ import (
     "strconv"
     "time"
 
-    ct "github.com/daviddengcn/go-colortext"
+    ct       "github.com/daviddengcn/go-colortext"
+    settings "github.com/lovek323/bclog/settings"
 )
-
-type PhpLogEventInterface interface {
-    Println(int)
-    PrintFull()
-}
 
 type PhpLogEvent struct {
     SyslogTime time.Time
@@ -23,28 +19,7 @@ type PhpLogEvent struct {
     Line       int
 }
 
-func (e *PhpLogEvent) Println(index int) {
-    ignoreFilters := []string{
-        "^Failed to write to Twig cache.*$",
-        "^Undefined index: MBALoginToken$",
-    }
-
-    for _, ignoreFilter := range ignoreFilters {
-        matched, err := regexp.MatchString(ignoreFilter, e.Content)
-
-        if err != nil {
-            log.Fatalf(
-                "Error while matching ignore filters: %s (%s)\n",
-                ignoreFilter,
-                err,
-            )
-        }
-
-        if matched {
-            return;
-        }
-    }
-
+func (e *PhpLogEvent) PrintLine(index int) {
     background := ct.None
 
     switch (e.LogLevel) {
@@ -73,6 +48,36 @@ func (e *PhpLogEvent) Println(index int) {
 func (e *PhpLogEvent) PrintFull() {
 }
 
+func (e *PhpLogEvent) Summary() string {
+    return "php-"+e.LogLevel
+}
+
+func (e *PhpLogEvent) GetSyslogTime() time.Time {
+    return e.SyslogTime
+}
+
+func (e *PhpLogEvent) Suppress(settings_ settings.SettingsInterface) bool {
+    contentPatterns := settings_.GetPhpSuppressContentRegexes()
+
+    for _, pattern := range contentPatterns {
+        matched, err := regexp.MatchString(pattern, e.Content)
+
+        if err != nil {
+            log.Fatalf(
+                "Error while matching ignore filters: %s (%s)\n",
+                pattern,
+                err,
+            )
+        }
+
+        if matched {
+            return true;
+        }
+    }
+
+    return false
+}
+
 type PhpStackTraceEvent struct {
     SyslogTime time.Time
     Number     int
@@ -81,7 +86,7 @@ type PhpStackTraceEvent struct {
     Line       int
 }
 
-func (e *PhpStackTraceEvent) Println(index int) {
+func (e *PhpStackTraceEvent) PrintLine(index int) {
     // Don't show stack traces.
     return;
 
@@ -98,11 +103,25 @@ func (e *PhpStackTraceEvent) Println(index int) {
 func (e *PhpStackTraceEvent) PrintFull() {
 }
 
+func (e *PhpStackTraceEvent) Summary() string {
+    return "php-stack-trace"
+}
+
+func (e *PhpStackTraceEvent) Suppress(
+    settings_ settings.SettingsInterface,
+) bool {
+    return settings_.GetPhpSuppressStackTraces()
+}
+
+func (e *PhpStackTraceEvent) GetSyslogTime() time.Time {
+    return e.SyslogTime
+}
+
 func NewPhpLogEvent(
     syslogTime time.Time,
     source string,
     message string,
-) PhpLogEventInterface {
+) LogEventInterface {
     re := regexp.MustCompile("^(?P<source>.*?): PHP Stack trace:")
 
     matches := re.FindStringSubmatch(message)

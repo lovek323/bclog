@@ -7,13 +7,9 @@ import (
     "strconv"
     "time"
 
-    ct "github.com/daviddengcn/go-colortext"
+    ct       "github.com/daviddengcn/go-colortext"
+    settings "github.com/lovek323/bclog/settings"
 )
-
-type NginxLogEventInterface interface {
-    Println(int)
-    PrintFull()
-}
 
 type NginxAccessLogEvent struct {
     SyslogTime time.Time
@@ -32,12 +28,7 @@ type NginxLogEventRequest struct {
     ContentLength   int
 }
 
-func (e *NginxAccessLogEvent) Println(index int) {
-    // Ignore 200-399 events manually for now
-    if e.Request.StatusCode >= 200 && e.Request.StatusCode < 400 {
-        return
-    }
-
+func (e *NginxAccessLogEvent) PrintLine(index int) {
     background := ct.None
     bold       := false
 
@@ -77,6 +68,26 @@ func (e *NginxAccessLogEvent) PrintFull() {
     fmt.Printf("--------------------------------------------\n\n");
 }
 
+func (e *NginxAccessLogEvent) Summary() string {
+    return "nginx-access-"+strconv.FormatInt(int64(e.Request.StatusCode), 10)
+}
+
+func (e *NginxAccessLogEvent) Suppress(
+    settings_ settings.SettingsInterface,
+) bool {
+    for _, statusCode := range settings_.GetNginxSuppressStatusCodes() {
+        if e.Request.StatusCode == statusCode {
+            return true
+        }
+    }
+
+    return false
+}
+
+func (e *NginxAccessLogEvent) GetSyslogTime() time.Time {
+    return e.SyslogTime
+}
+
 type NginxErrorLogEvent struct {
     SyslogTime time.Time
     LogLevel   string
@@ -88,7 +99,7 @@ type NginxErrorLogEvent struct {
     Referrer   string
 }
 
-func (e *NginxErrorLogEvent) Println(index int) {
+func (e *NginxErrorLogEvent) PrintLine(index int) {
     fmt.Printf("[%d]  ", index)
 
     if e.LogLevel == "error" {
@@ -114,7 +125,25 @@ func (e *NginxErrorLogEvent) Println(index int) {
 func (e *NginxErrorLogEvent) PrintFull() {
 }
 
-func NewNginxLogEvent(syslogTime time.Time, source string, message string) NginxLogEventInterface {
+func (e *NginxErrorLogEvent) Summary() string {
+    return "nginx-error-"+strconv.FormatInt(int64(e.Request.StatusCode), 10)
+}
+
+func (e *NginxErrorLogEvent) Suppress(
+    settings_ settings.SettingsInterface,
+) bool {
+    return false
+}
+
+func (e *NginxErrorLogEvent) GetSyslogTime() time.Time {
+    return e.SyslogTime
+}
+
+func NewNginxLogEvent(
+    syslogTime time.Time,
+    source string,
+    message string,
+) LogEventInterface {
     re := regexp.MustCompile(
         "^nginx: (?P<hostname>.*?) (?P<ipAddress>[0-9\\.]*) (?:.*?) (?:.*?) "+
         "\\[(?P<time>[0-9]{2}/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/[0-9]{4}:[0-9]{2}:[0-9]{2}:[0-9]{2} \\+[0-9]{4})\\]  "+

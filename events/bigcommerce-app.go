@@ -7,7 +7,8 @@ import (
     "regexp"
     "time"
 
-    ct "github.com/daviddengcn/go-colortext"
+    ct       "github.com/daviddengcn/go-colortext"
+    settings "github.com/lovek323/bclog/settings"
 )
 
 type BigcommerceAppLogEvent struct {
@@ -25,11 +26,7 @@ type BigcommerceAppStoreContext struct {
     Domain    string
 }
 
-func (e *BigcommerceAppLogEvent) Println(index int) {
-    /* if (e.LogLevel == "DEBUG") {
-        return;
-    } */
-
+func (e *BigcommerceAppLogEvent) PrintLine(index int) {
     fmt.Printf("[%d]  ", index)
     fmt.Printf("%s  ", e.SyslogTime.Format("2006-01-02 15:04:05"))
     ct.ChangeColor(ct.Yellow, false, ct.None, false)
@@ -54,6 +51,28 @@ func (e *BigcommerceAppLogEvent) PrintFull() {
     fmt.Printf("StoreHash:  %s\n", e.StoreContext.StoreHash)
     fmt.Printf("Domain:     %s\n", e.StoreContext.Domain)
     fmt.Printf("-------------------------------------------\n\n");
+}
+
+func (e *BigcommerceAppLogEvent) Summary() string {
+    return "bigcommerce-app-"+e.LogLevel
+}
+
+func (e *BigcommerceAppLogEvent) Suppress(
+    settings_ settings.SettingsInterface,
+) bool {
+    suppressedLevels := settings_.GetBigcommerceAppSuppressLogLevels()
+
+    for _, logLevel := range suppressedLevels {
+        if e.LogLevel == logLevel {
+            return true
+        }
+    }
+
+    return false
+}
+
+func (e *BigcommerceAppLogEvent) GetSyslogTime() time.Time {
+    return e.SyslogTime
 }
 
 func NewBigcommerceAppLogEvent(
