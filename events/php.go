@@ -40,6 +40,9 @@ func (e *PhpLogEvent) PrintLine(index int) {
     case "Catchable fatal error":
         background = ct.Red
         break
+    case "Parse error":
+        background = ct.Red
+        break
     case "SQL Error":
         background = ct.Red
         break
@@ -94,7 +97,7 @@ func (e *PhpLogEvent) PrintFull() {
 
     writer.Flush()
 
-    fmt.Printf("-----------------------------------\n");
+    fmt.Printf("\n---------- PHP LOG EVENT ----------\n");
 }
 
 func (e *PhpLogEvent) Summary() string {

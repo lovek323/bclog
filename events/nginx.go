@@ -126,7 +126,7 @@ func (e *NginxErrorLogEvent) PrintFull() {
 }
 
 func (e *NginxErrorLogEvent) Summary() string {
-    return "nginx-error-"+strconv.FormatInt(int64(e.Request.StatusCode), 10)
+    return "nginx-error-"+e.LogLevel
 }
 
 func (e *NginxErrorLogEvent) Suppress(
@@ -160,8 +160,8 @@ func NewNginxLogEvent(
             "^nginx:  \\[(?P<level>.*?)\\] (?P<content>.*?), "+
             "client: (?P<clientIp>.*), server: (?P<server>.*), "+
             "request: \"(?P<method>.*?) (?P<uri>.*?) "+
-            "(?P<protocolVersion>.*?)\", host: (?P<host>.*?), "+
-            "referrer: (?P<referrer>.*?)$",
+            "(?P<protocolVersion>.*?)\", host: (?P<host>.*?)"+
+            "(?:, referrer: (?P<referrer>.*?)|)$",
         )
 
         matches = re.FindStringSubmatch(message)

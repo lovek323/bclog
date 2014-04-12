@@ -163,7 +163,7 @@ func show(args []string) {
     fmt.Printf("Showing %s events from the last %s\n", summary, duration)
 
     for index, event := range history {
-        if event.Summary() == summary &&
+        if (summary == "*" || event.Summary() == summary) &&
             history[len(history)-1].GetSyslogTime().Sub(event.GetSyslogTime()) <= duration {
             event.PrintLine(index)
         }
