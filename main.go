@@ -20,21 +20,12 @@ import (
     linenoise "github.com/GeertJohan/go.linenoise"
 )
 
-type LogEventInterface interface {
-    PrintLine(int)
-    PrintFull()
-
-    GetSyslogTime()                      time.Time
-    Summary()                            string
-    Suppress(settings.SettingsInterface) bool
-}
-
-var history    []LogEventInterface
-var statistics map[string][]LogEventInterface
+var history    []events.LogEventInterface
+var statistics map[string][]events.LogEventInterface
 var settings_  settings.Settings
 
 func main() {
-    statistics = make(map[string][]LogEventInterface)
+    statistics = make(map[string][]events.LogEventInterface)
 
     loadConfig()
 
@@ -231,7 +222,7 @@ func readLog() {
             summary := event.Summary()
 
             if _, exists := statistics[summary]; !exists {
-                statistics[summary] = make([]LogEventInterface, 1)
+                statistics[summary] = make([]events.LogEventInterface, 1)
             }
 
             statistics[summary] = append(statistics[summary], event)
@@ -241,7 +232,7 @@ func readLog() {
     command.Wait()
 }
 
-func getEvent(text string) LogEventInterface {
+func getEvent(text string) events.LogEventInterface {
     re := regexp.MustCompile(
         "^(?P<date>(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Oct|Nov|Dec) "+
         "(?:[0-9]{1,}) [0-9]{2}:[0-9]{2}:[0-9]{2}) "+
@@ -265,23 +256,32 @@ func getEvent(text string) LogEventInterface {
     source  := matches[2]
     message := matches[3]
 
-    var event LogEventInterface
+    var event events.LogEventInterface
 
     event = events.NewNginxLogEvent(syslogTime, source, message)
 
-    if event != (LogEventInterface)(nil) {
+    if event != (events.LogEventInterface)(nil) {
         return event
     }
 
     event = events.NewProcessLogEvent(syslogTime, source, message)
 
-    if event != (LogEventInterface)(nil) {
+    if event != (events.LogEventInterface)(nil) {
         return event
     }
 
     event = events.NewPhpLogEvent(syslogTime, source, message)
 
-    if event != (LogEventInterface)(nil) {
+    if phpStackTraceLogEvent, ok := event.(*events.PhpStackTraceLogEvent); ok {
+        for i := len(history)-1; i >= 0; i-- {
+            if phpLogEvent, ok := (history[i]).(*events.PhpLogEvent); ok {
+                phpLogEvent.AddStackTraceEvent(phpStackTraceLogEvent)
+                break
+            }
+        }
+    }
+
+    if event != (events.LogEventInterface)(nil) {
         return event
     }
 

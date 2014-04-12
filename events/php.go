@@ -3,8 +3,10 @@ package events
 import (
     "fmt"
     "log"
+    "os"
     "regexp"
     "strconv"
+    "text/tabwriter"
     "time"
 
     ct       "github.com/daviddengcn/go-colortext"
@@ -12,11 +14,16 @@ import (
 )
 
 type PhpLogEvent struct {
-    SyslogTime time.Time
-    LogLevel   string
-    Content    string
-    File       string
-    Line       int
+    SyslogTime       time.Time
+    LogLevel         string
+    Content          string
+    File             string
+    Line             int
+    StackTraceEvents []PhpStackTraceLogEvent
+}
+
+func (e *PhpLogEvent) AddStackTraceEvent(stackTraceEvent *PhpStackTraceLogEvent) {
+    e.StackTraceEvents = append(e.StackTraceEvents, *stackTraceEvent)
 }
 
 func (e *PhpLogEvent) PrintLine(index int) {
@@ -52,6 +59,42 @@ func (e *PhpLogEvent) PrintLine(index int) {
 }
 
 func (e *PhpLogEvent) PrintFull() {
+    fmt.Printf("\n---------- PHP LOG EVENT ----------\n");
+
+    writer := new(tabwriter.Writer)
+    writer.Init(os.Stdout, 0, 8, 2, ' ', 0)
+
+    fmt.Fprintf(
+        writer,
+        "SyslogTime:\t%s\n",
+        e.SyslogTime.Format("2006-01-02 15:04:05"),
+    )
+
+    fmt.Fprintf(writer, "LogLevel:\t%s\n", e.LogLevel)
+    fmt.Fprintf(writer, "Content:\t%s\n", e.Content)
+    fmt.Fprintf(writer, "File:\t%s\n", e.File)
+    fmt.Fprintf(writer, "Line:\t%d\n", e.Line)
+
+    writer.Flush()
+
+    ct.ChangeColor(ct.White, true, ct.None, false)
+    fmt.Print("\nStack trace\n")
+    ct.ResetColor()
+
+    for _, phpStackTraceLogEvent := range e.StackTraceEvents {
+        fmt.Fprintf(
+            writer,
+            "%d.\t%s\t%s\t%d\n",
+            phpStackTraceLogEvent.Number,
+            phpStackTraceLogEvent.Method,
+            phpStackTraceLogEvent.File,
+            phpStackTraceLogEvent.Line,
+        )
+    }
+
+    writer.Flush()
+
+    fmt.Printf("-----------------------------------\n");
 }
 
 func (e *PhpLogEvent) Summary() string {
@@ -84,7 +127,7 @@ func (e *PhpLogEvent) Suppress(settings_ settings.SettingsInterface) bool {
     return false
 }
 
-type PhpStackTraceEvent struct {
+type PhpStackTraceLogEvent struct {
     SyslogTime time.Time
     Number     int
     Method     string
@@ -92,7 +135,11 @@ type PhpStackTraceEvent struct {
     Line       int
 }
 
-func (e *PhpStackTraceEvent) PrintLine(index int) {
+func (e *PhpStackTraceLogEvent) GetSyslogTime() time.Time {
+    return e.SyslogTime
+}
+
+func (e *PhpStackTraceLogEvent) PrintLine(index int) {
     // Don't show stack traces.
     return;
 
@@ -106,21 +153,17 @@ func (e *PhpStackTraceEvent) PrintLine(index int) {
     fmt.Printf("%s\n", e.Method)
 }
 
-func (e *PhpStackTraceEvent) PrintFull() {
+func (e *PhpStackTraceLogEvent) PrintFull() {
 }
 
-func (e *PhpStackTraceEvent) Summary() string {
+func (e *PhpStackTraceLogEvent) Summary() string {
     return "php-stack-trace"
 }
 
-func (e *PhpStackTraceEvent) Suppress(
+func (e *PhpStackTraceLogEvent) Suppress(
     settings_ settings.SettingsInterface,
 ) bool {
     return settings_.GetPhpSuppressStackTraces()
-}
-
-func (e *PhpStackTraceEvent) GetSyslogTime() time.Time {
-    return e.SyslogTime
 }
 
 func NewPhpLogEvent(
@@ -133,7 +176,7 @@ func NewPhpLogEvent(
     matches := re.FindStringSubmatch(message)
 
     if matches != nil {
-        return &PhpStackTraceEvent{
+        return &PhpStackTraceLogEvent{
             SyslogTime: syslogTime,
             Number:     0,
             Method:     "",
@@ -211,7 +254,7 @@ func NewPhpLogEvent(
             log.Fatalf("Could not parse line: %s (%s)\n", matches[5], err)
         }
 
-        return &PhpStackTraceEvent{
+        return &PhpStackTraceLogEvent{
             SyslogTime: syslogTime,
             Number:     int(number),
             Method:     matches[3],
@@ -242,7 +285,7 @@ func NewPhpLogEvent(
             log.Fatalf("Could not parse line: %s (%s)\n", matches[5], err)
         }
 
-        return &PhpStackTraceEvent{
+        return &PhpStackTraceLogEvent{
             SyslogTime: syslogTime,
             Number:     int(number),
             Method:     matches[3],
