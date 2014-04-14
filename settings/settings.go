@@ -19,6 +19,10 @@ type Settings struct {
         SuppressStackTraces    bool
         SuppressContentRegexes []string
     }
+
+    Generic struct {
+        SuppressNames []string
+    }
 }
 
 type SettingsInterface interface {
@@ -27,6 +31,7 @@ type SettingsInterface interface {
    GetPhpSuppressStackTraces()          bool
    GetPhpSuppressContentRegexes()       []string
    GetProcessSuppressNames()            []string
+   GetGenericSuppressNames()            []string
 }
 
 func (s *Settings) GetBigcommerceAppSuppressLogLevels() []string {
@@ -47,4 +52,8 @@ func (s *Settings) GetPhpSuppressContentRegexes() []string {
 
 func (s *Settings) GetProcessSuppressNames() []string {
     return s.Process.SuppressNames
+}
+
+func (s *Settings) GetGenericSuppressNames() []string {
+    return s.Generic.SuppressNames
 }

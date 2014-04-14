@@ -134,6 +134,7 @@ type PhpStackTraceLogEvent struct {
     SyslogTime time.Time
     Number     int
     Method     string
+    Parameters string
     File       string
     Line       int
 }
@@ -143,9 +144,6 @@ func (e *PhpStackTraceLogEvent) GetSyslogTime() time.Time {
 }
 
 func (e *PhpStackTraceLogEvent) PrintLine(index int) {
-    // Don't show stack traces.
-    return;
-
     fmt.Printf("[%d]  ", index)
     fmt.Print(e.SyslogTime.Format("2006-01-02 15:04:05")+"  ")
     ct.ChangeColor(ct.Yellow, false, ct.None, false)
@@ -227,41 +225,112 @@ func NewPhpLogEvent(
             log.Fatalf("Could not parse line: %s (%s)\n", matches[5], err)
         }
 
-        return &PhpLogEvent{
+        logLevel := matches[2]
+        content  := matches[3]
+        file     := matches[4]
+
+        event := PhpLogEvent{
             SyslogTime: syslogTime,
-            LogLevel:   matches[2],
-            Content:    matches[3],
-            File:       matches[4],
+            LogLevel:   logLevel,
+            Content:    content,
+            File:       file,
             Line:       int(line),
         }
+
+        re = regexp.MustCompile(
+            "^Uncaught exception '(?P<type>.*?)' with message "+
+            "'(?P<message>.*?)' in (?P<firstFile>[^ ]{1,}):"+
+            "(?P<firstLine>[0-9]{1,})(?P<stackTrace>.*)",
+        )
+        matches = re.FindStringSubmatch(content)
+
+        if matches != nil {
+            event.Content = matches[1]+": "+matches[2]
+
+            re = regexp.MustCompile(
+                "#(?P<number>[0-9]{1,})#(?P<index>[0-9]{1,}) "+
+                "(?P<file>[^ ]{1,})\\((?P<line>[0-9]{1,})\\): (?P<details>.*?)",
+            )
+
+            stackTrace := matches[5]
+            matches_   := re.FindAllStringSubmatch(stackTrace, -1)
+
+            for _, match := range matches_ {
+                // number := match[1]
+                index, err := strconv.ParseInt(match[2], 10, 32)
+
+                if err != nil {
+                    log.Fatalf(
+                        "Could not parse number: %s (%s)\n",
+                        matches[2],
+                        err,
+                    )
+                }
+
+                file := match[3]
+
+                line, err := strconv.ParseInt(match[4], 10, 32)
+
+                if err != nil {
+                    log.Fatalf(
+                        "Could not parse number: %s (%s)\n",
+                        matches[4],
+                        err,
+                    )
+                }
+
+                details := match[5]
+
+                stackTraceEvent := &PhpStackTraceLogEvent {
+                    SyslogTime: event.SyslogTime,
+                    Number:     int(index),
+                    Method:     details,
+                    Parameters: "",
+                    File:       file,
+                    Line:       int(line),
+                }
+
+                event.AddStackTraceEvent(stackTraceEvent)
+            }
+        }
+
+        return &event
     }
 
     // Search for a stack trace.
     re = regexp.MustCompile(
         "^(?P<source>.*?): PHP[ ]{1,}(?P<number>[0-9]{1,})\\. "+
-        "(?P<method>[^ ]*) (?P<file>[^ ]*):(?P<line>[0-9]{1,})$",
+        "(?P<method>.*)\\((?P<parameters>.{0,})\\) "+
+        "(?P<file>[^ ]*):(?P<line>[0-9]{1,})$",
     )
 
     matches = re.FindStringSubmatch(message)
 
     if matches != nil {
+        // source := matches[1]
+
         number, err := strconv.ParseInt(matches[2], 10, 32)
 
         if err != nil {
             log.Fatalf("Could not parse number: %s (%s)\n", matches[2], err)
         }
 
-        line, err := strconv.ParseInt(matches[5], 10, 32)
+        method     := matches[3]
+        parameters := matches[4]
+        file       := matches[5]
+
+        line, err := strconv.ParseInt(matches[6], 10, 32)
 
         if err != nil {
-            log.Fatalf("Could not parse line: %s (%s)\n", matches[5], err)
+            log.Fatalf("Could not parse line: %s (%s)\n", matches[6], err)
         }
 
         return &PhpStackTraceLogEvent{
             SyslogTime: syslogTime,
             Number:     int(number),
-            Method:     matches[3],
-            File:       matches[4],
+            Method:     method,
+            Parameters: parameters,
+            File:       file,
             Line:       int(line),
         }
     }
@@ -296,8 +365,6 @@ func NewPhpLogEvent(
             Line:       int(line),
         }
     }
-
-    fmt.Printf("\rNot a PHP log message: %s\n", message)
 
     return nil
 }

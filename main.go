@@ -15,6 +15,7 @@ import (
     "text/tabwriter"
     "time"
 
+    ct       "github.com/daviddengcn/go-colortext"
     events    "github.com/lovek323/bclog/events"
     settings  "github.com/lovek323/bclog/settings"
     linenoise "github.com/GeertJohan/go.linenoise"
@@ -23,6 +24,7 @@ import (
 var history    []events.LogEventInterface
 var statistics map[string][]events.LogEventInterface
 var settings_  settings.Settings
+var lastPrompt time.Time
 
 func main() {
     statistics = make(map[string][]events.LogEventInterface)
@@ -50,6 +52,8 @@ func main() {
 
     go func () {
         for {
+            lastPrompt = time.Now()
+
             line, err := linenoise.Line("> ")
 
             if err != nil {
@@ -73,12 +77,12 @@ func main() {
             }
 
             switch (args[0]) {
-            case "": break
+            case "": summary([]string{"last-prompt"}); break
             case "clear": linenoise.Clear(); break
             case "quit": quit(); break
             case "reload": loadConfig(); break
             case "show": show(args[1:]); break
-            case "summary": summary(); break
+            case "summary": summary(args[1:]); break
 
             default:
                 index, err := strconv.ParseInt(line, 10, 32)
@@ -116,8 +120,31 @@ func quit() {
     os.Exit(0)
 }
 
-func summary() {
-    fmt.Print("\n---------- SUMMARY ----------\n")
+func summary(args []string) {
+    var duration time.Duration
+    var err error
+
+    if len(args) > 0 {
+        if args[0] == "last-prompt" {
+            duration = time.Now().Sub(lastPrompt)
+        } else {
+            duration, err = time.ParseDuration(args[0])
+
+            if err != nil {
+                fmt.Println(
+                    "Invalid syntax: first argument to summary must be a valid "+
+                    "duration or empty",
+                );
+                fmt.Println("summary [duration]\n");
+            }
+        }
+    } else {
+        duration, _ = time.ParseDuration("24h")
+    }
+
+    ct.ChangeColor(ct.Yellow, true, ct.None, false)
+    fmt.Printf("\nSUMMARY (LAST %s)\n", duration)
+    ct.ResetColor()
 
     writer := new(tabwriter.Writer)
     writer.Init(os.Stdout, 0, 8, 2, ' ', 0)
@@ -127,18 +154,33 @@ func summary() {
             events[len(events)-1].GetSyslogTime(),
         )
 
+        count := 0
+
+        for _, event := range events {
+            if event == nil {
+                continue
+            }
+            if history[len(history)-1].GetSyslogTime().Sub(event.GetSyslogTime()) <= duration {
+                count++
+            }
+        }
+
+        if count == 0 {
+            continue
+        }
+
         fmt.Fprintf(
             writer,
             "%s\t%d event(s)\tLast %s ago\n",
             summary,
-            len(events),
+            count,
             lastDuration,
         )
     }
 
     writer.Flush()
 
-    fmt.Print("-----------------------------\n\n")
+    fmt.Print("\n")
 }
 
 func show(args []string) {
@@ -209,8 +251,8 @@ func readLog() {
         event := getEvent(line)
 
         if event == nil {
-            fmt.Print("\r")
-            log.Printf("Could not parse: %s", line)
+            log.Printf("\rCould not parse: %s", line)
+            fmt.Print("\r> ")
         } else {
             if (!event.Suppress(&settings_)) {
                 fmt.Print("\r")
@@ -280,6 +322,12 @@ func getEvent(text string) events.LogEventInterface {
             }
         }
     }
+
+    if event != (events.LogEventInterface)(nil) {
+        return event
+    }
+
+    event = events.NewGenericLogEvent(syslogTime, source, message)
 
     if event != (events.LogEventInterface)(nil) {
         return event

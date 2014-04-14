@@ -1,5 +1,5 @@
 {
-  "PrimaryKeyFile": "/Users/jason.oconal/.vagrant.d/insecure_private_key",
+  "PrimaryKeyFile": "",
   "BigcommerceApp": {
     "SuppressLogLevels": [ "DEBUG" ]
   },
@@ -9,18 +9,37 @@
   "Process": {
     "SuppressNames": [
       "/USR/SBIN/CRON",
-      "postfix/pickup",
+      "/etc/mysql/debian-start",
+      "/usr/sbin/cron",
+      "acpid",
+      "crontab",
+      "dhclient",
+      "dnsmasq",
+      "kernel",
+      "manage_ips",
+      "php-fpm",
       "postfix/cleanup",
-      "postfix/qmgr",
       "postfix/discard",
-      "postfix/smtp"
+      "postfix/master",
+      "postfix/pickup",
+      "postfix/postfix-script",
+      "postfix/qmgr",
+      "postfix/smtp",
+      "rsyslogd",
+      "terminatord"
     ]
   },
   "Php": {
-    "SuppressStackTraces": false,
+    "SuppressStackTraces": true,
     "SuppressContentRegexes": [
       "^Failed to write to Twig cache.*$",
       "^Undefined index: MBALoginToken$"
+    ]
+  },
+  "Generic": {
+    "SuppressNames": [
+      "kernel",
+      "php"
     ]
   }
 }
