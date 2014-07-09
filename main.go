@@ -9,6 +9,7 @@ import (
     "log"
     "os"
     "os/exec"
+    "os/user"
     "regexp"
     "strconv"
     "strings"
@@ -101,18 +102,20 @@ func main() {
 }
 
 func loadConfig() {
-    configJson, err := ioutil.ReadFile("config.json")
+    user, err := user.Current()
+    if err != nil {
+        log.Fatalf("Could not determine home directory: %s\n", err)
+    }
+    configJson, err := ioutil.ReadFile(fmt.Sprintf("%s/.config/bclog/config.json", user.HomeDir))
 
     if err != nil {
-        log.Fatalf("Error reading config.json: %s", err)
+        log.Fatalf("Error reading ~/.config/bclog/config.json: %s", err)
     }
-
     err = json.Unmarshal(configJson, &settings_)
 
     if err != nil {
-        log.Fatalf("Error reading config.json: %s", err)
+        log.Fatalf("Error reading ~/.config/bclog/config.json: %s", err)
     }
-
     fmt.Println("Loaded config\n")
 }
 
@@ -276,7 +279,7 @@ func readLog() {
 
 func getEvent(text string) events.LogEventInterface {
     re := regexp.MustCompile(
-        "^(?P<date>(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Oct|Nov|Dec) "+
+        "^(?P<date>(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Oct|Nov|Dec)(?:[ ]{1,})"+
         "(?:[0-9]{1,}) [0-9]{2}:[0-9]{2}:[0-9]{2}) "+
         "(?P<source>.*?) "+
         //"(?P<process>[A-Za-z])\\[(?P<pid>[0-9]{1,})\\]: "+

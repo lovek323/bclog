@@ -77,6 +77,7 @@ func NewProcessLogEvent(
 
     switch (name) {
     case "bigcommerce_app":
+    case "ool bigcommerce_app":
         event := NewBigcommerceAppLogEvent(
             syslogTime,
             source,
