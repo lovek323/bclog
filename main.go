@@ -220,7 +220,7 @@ func readLog() {
     command := exec.Command(
         "ssh",
         "vagrant@localhost",
-        "-p2222",
+        "-p2200",
         "-i",
         settings_.PrimaryKeyFile,
         "--",

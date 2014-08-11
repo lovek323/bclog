@@ -39,7 +39,8 @@
   "Generic": {
     "SuppressNames": [
       "kernel",
-      "php"
+      "php",
+      "fornax-relay"
     ]
   }
 }
