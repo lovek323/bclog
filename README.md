@@ -1,11 +1,47 @@
 # Bigcommerce Syslog Formatter
+
 Here, I fixed it.
 
+
+## Installation
+
+### On a mac
+
+```bash
+brew install go
+go get github.com/lovek323/bclog
+```
+
+### On the VM
+
+This will be overwritten whenever you re-bootstrap your VM, so it may be wiser
+to install on the host machine (see above).
+
+```
+vagrant@bcapp:~$ sudo apt-get install golang
+vagrant@bcapp:~$ sudo go get github.com/lovek323/bclog
+```
+
+These steps haven't been extensively tested. YMMV.
+
+
 ## Configuration
+
 Copy `config.json` to `~/.config/bclog/config.json` and set `PrimaryKeyFile` to
 `/Users/your.username/.vagrant.d/insecure_private_key`.
 
 You can modify the types of messages you ignore.
+
+
+## Running
+
+Make sure you have properly configured your installation first (see above).
+
+```
+cd ${GOPATH}/src/github.com/lovek323/bclog
+go run main.go
+```
+
 
 ## Message format
 
