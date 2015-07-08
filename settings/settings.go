@@ -1,59 +1,61 @@
 package settings
 
 type Settings struct {
-    PrimaryKeyFile string
+	PrimaryKeyFile string
 
-    BigcommerceApp struct {
-        SuppressLogLevels []string
-    }
+	InitialLines int
 
-    NginxAccess struct {
-        SuppressStatusCodes []int
-    }
+	BigcommerceApp struct {
+		SuppressLogLevels []string
+	}
 
-    Process struct {
-        SuppressNames []string
-    }
+	NginxAccess struct {
+		SuppressStatusCodes []int
+	}
 
-    Php struct {
-        SuppressStackTraces    bool
-        SuppressContentRegexes []string
-    }
+	Process struct {
+		SuppressNames []string
+	}
 
-    Generic struct {
-        SuppressNames []string
-    }
+	Php struct {
+		SuppressStackTraces    bool
+		SuppressContentRegexes []string
+	}
+
+	Generic struct {
+		SuppressNames []string
+	}
 }
 
 type SettingsInterface interface {
-   GetBigcommerceAppSuppressLogLevels() []string
-   GetNginxSuppressStatusCodes()        []int
-   GetPhpSuppressStackTraces()          bool
-   GetPhpSuppressContentRegexes()       []string
-   GetProcessSuppressNames()            []string
-   GetGenericSuppressNames()            []string
+	GetBigcommerceAppSuppressLogLevels() []string
+	GetNginxSuppressStatusCodes() []int
+	GetPhpSuppressStackTraces() bool
+	GetPhpSuppressContentRegexes() []string
+	GetProcessSuppressNames() []string
+	GetGenericSuppressNames() []string
 }
 
 func (s *Settings) GetBigcommerceAppSuppressLogLevels() []string {
-    return s.BigcommerceApp.SuppressLogLevels
+	return s.BigcommerceApp.SuppressLogLevels
 }
 
 func (s *Settings) GetNginxSuppressStatusCodes() []int {
-    return s.NginxAccess.SuppressStatusCodes
+	return s.NginxAccess.SuppressStatusCodes
 }
 
 func (s *Settings) GetPhpSuppressStackTraces() bool {
-    return s.Php.SuppressStackTraces
+	return s.Php.SuppressStackTraces
 }
 
 func (s *Settings) GetPhpSuppressContentRegexes() []string {
-    return s.Php.SuppressContentRegexes
+	return s.Php.SuppressContentRegexes
 }
 
 func (s *Settings) GetProcessSuppressNames() []string {
-    return s.Process.SuppressNames
+	return s.Process.SuppressNames
 }
 
 func (s *Settings) GetGenericSuppressNames() []string {
-    return s.Generic.SuppressNames
+	return s.Generic.SuppressNames
 }

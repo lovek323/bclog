@@ -1,5 +1,6 @@
 {
   "PrimaryKeyFile": "",
+  "InitialLines": 100,
   "BigcommerceApp": {
     "SuppressLogLevels": [ "DEBUG" ]
   },
@@ -26,7 +27,9 @@
       "postfix/qmgr",
       "postfix/smtp",
       "rsyslogd",
-      "terminatord"
+      "terminatord",
+      "redis-resque",
+      "redis-sentine"
     ]
   },
   "Php": {

@@ -60,6 +60,8 @@ available: `clear` (clears the screen), `reload` (reloads your config file),
 `show` (shows details for a particular category of message), `quit` (quits the
 program) and `summary` (shows a summary of all events over a timeframe).
 
+For online help, type `help`.
+
 ### Showing a summary
 
 #### Default summary
