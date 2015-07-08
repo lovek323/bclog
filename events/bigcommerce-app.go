@@ -4,23 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	ct "github.com/daviddengcn/go-colortext"
-	settings "github.com/lovek323/bclog/settings"
+	"github.com/lovek323/bclog/settings"
 )
 
 type BigcommerceAppLogEvent struct {
-	SyslogTime   time.Time
-	ProcessId    int
-	LogLevel     string
-	Content      string
-	Args         string
-	StoreContext BigcommerceAppStoreContext
+	SyslogTime      time.Time
+	ProcessId       int
+	LogLevel        string
+	Content         string
+	Args            string
+	StoreContext    BigcommerceAppStoreContext
+	OriginalMessage string
 }
 
 type BigcommerceAppStoreContext struct {
@@ -53,6 +52,7 @@ func (e *BigcommerceAppLogEvent) PrintFull() {
 	fmt.Printf("StoreId:    %d\n", e.StoreContext.StoreId)
 	fmt.Printf("StoreHash:  %s\n", e.StoreContext.StoreHash)
 	fmt.Printf("Domain:     %s\n", e.StoreContext.Domain)
+	fmt.Printf("Original:   %s\n", e.OriginalMessage)
 	fmt.Printf("-------------------------------------------\n\n")
 }
 
@@ -89,45 +89,59 @@ func NewBigcommerceAppLogEvent(
 			"(?P<args>\\[\\]|\\{.*?\\}) (?P<storeContext>\\{.*?\\})$",
 	)
 
-	if utf8.RuneCountInString(message) == 1024 {
-		log.Printf("Message length: %d\n", utf8.RuneCountInString(message))
-		os.Exit(2)
-	}
-
 	matches := re.FindStringSubmatch(message)
 
-	if matches == nil {
-		return nil
+	args := ""
+	storeContextJson := ""
+
+	if matches != nil {
+		storeContextJson = matches[4]
+	} else {
+		re = regexp.MustCompile(
+			"^BigcommerceApp\\.(?P<logLevel>.*?): (?P<content>.*?) " +
+			"(?P<args>.+)$",
+		)
+		matches = re.FindStringSubmatch(message)
+		if matches == nil {
+			re = regexp.MustCompile("^BigcommerceApp\\.(?P<logLevel>.*?): (?P<content>.+)$")
+			matches = re.FindStringSubmatch(message)
+			if matches == nil {
+				return nil
+			}
+		} else {
+			args = matches[3]
+		}
 	}
 
 	logLevel := matches[1]
 	content := matches[2]
-	args := matches[3]
-	storeContextJson := matches[4]
 
 	// Replace NULL with 0
 	storeContextJson = strings.Replace(storeContextJson, "NULL", "0", -1)
 
 	var storeContext BigcommerceAppStoreContext
 
-	err := json.Unmarshal([]byte(storeContextJson), &storeContext)
+	if storeContextJson != "" {
+		err := json.Unmarshal([]byte(storeContextJson), &storeContext)
 
-	if err != nil {
-		log.Printf(
-			"Could not parse store context: %s (%s)\n",
-			storeContextJson,
-			err,
-		)
+		if err != nil {
+			log.Printf(
+				"Could not parse store context: %s (%s)\n",
+				storeContextJson,
+				err,
+			)
 
-		return nil
+			return nil
+		}
 	}
 
 	return &BigcommerceAppLogEvent{
-		SyslogTime:   syslogTime,
-		ProcessId:    processId,
-		LogLevel:     logLevel,
-		Content:      content,
-		Args:         args,
-		StoreContext: storeContext,
+		SyslogTime:      syslogTime,
+		ProcessId:       processId,
+		LogLevel:        logLevel,
+		Content:         content,
+		Args:            args,
+		StoreContext:    storeContext,
+		OriginalMessage: message,
 	}
 }
