@@ -304,7 +304,7 @@ func NewPhpLogEvent(
 	re = regexp.MustCompile(
 		"^(?P<source>.*?): PHP[ ]{1,}(?P<number>[0-9]{1,})\\. " +
 			"(?P<method>.*)\\((?P<parameters>.{0,})\\) " +
-			"(?P<file>[^ ]*):(?P<line>[0-9]{1,})$",
+			"(?P<file>[^ ]*)(?P<eval> : eval\\(\\)'d code|):(?P<line>[0-9]{1,})$",
 	)
 
 	matches = re.FindStringSubmatch(message)
@@ -322,7 +322,7 @@ func NewPhpLogEvent(
 		parameters := matches[4]
 		file := matches[5]
 
-		line, err := strconv.ParseInt(matches[6], 10, 32)
+		line, err := strconv.ParseInt(matches[7], 10, 32)
 
 		if err != nil {
 			log.Fatalf("Could not parse line: %s (%s)\n", matches[6], err)
