@@ -264,7 +264,7 @@ func readLog() {
 		"-i",
 		settings_.PrimaryKeyFile,
 		"--",
-		"sudo tail -n "+strconv.FormatInt(int64(settings_.InitialLines), 10)+" -f /var/log/syslog",
+		"sudo tail -n "+strconv.FormatInt(int64(settings_.InitialLines), 10)+" -f /var/log/system.log",
 	)
 
 	stdout, err := command.StdoutPipe()
